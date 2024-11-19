@@ -1,21 +1,14 @@
 """
-Model class for the Report table in RPT schema.
+Model classes for the RPT schema.
+Automatically maps all tables and their relationships.
 """
 
+from typing import List
 from sqlalchemy.ext.automap import automap_base
-from app.core.database import Base, engine
+from app.models.base import Base, mapped_classes
 
-# Create automap base
-AutomapBase = automap_base()
+# Export all mapped classes from RPT schema
+Report = mapped_classes.get("Report")
+# Add other related models as needed based on your database structure
 
-# Prepare the automap base
-AutomapBase.prepare(engine, reflect=True, schema=None)  # This will reflect all schemas
-
-# Get the Report model from RPT schema
-try:
-    Report = AutomapBase.classes.get("RPT.Report")
-except Exception as e:
-    raise Exception(f"Failed to map Report table: {str(e)}")
-
-# Export the model
-__all__ = ["Report"]
+__all__ = ["Report"] + list(mapped_classes.keys())
