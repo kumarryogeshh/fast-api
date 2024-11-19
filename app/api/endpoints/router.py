@@ -3,12 +3,13 @@ API router module.
 Contains all API endpoint definitions.
 """
 
-from typing import Any, Dict, List
+from typing import Any, List, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
-from app.models.base import Base
+from app.models.report import Report
 from app.schemas.base import ResponseSchema
+from app.utils.db_utils import get_schema_tables, get_table_columns
 
 router = APIRouter()
 
@@ -24,60 +25,69 @@ def health_check() -> Dict[str, str]:
     return {"status": "healthy"}
 
 
-@router.get("/tables")
-def get_tables(db: Session = Depends(get_db)) -> ResponseSchema[List[str]]:
+@router.get("/schemas")
+def get_schemas_and_tables() -> ResponseSchema[Dict[str, List[str]]]:
     """
-    Get all available tables in the database.
-
-    Args:
-        db (Session): Database session from dependency
+    Get all schemas and their tables in the database.
 
     Returns:
-        ResponseSchema[List[str]]: List of table names
+        ResponseSchema[Dict[str, List[str]]]: Dictionary of schemas and their tables
     """
     try:
-        tables = Base.classes.keys()
+        schema_tables = get_schema_tables()
         return ResponseSchema(
-            success=True, message="Tables retrieved successfully", data=list(tables)
+            success=True,
+            message="Schemas and tables retrieved successfully",
+            data=schema_tables,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tables/{table_name}/records")
-def get_table_records(
-    table_name: str,
+@router.get("/schemas/{schema}/tables/{table}/columns")
+def get_table_structure(schema: str, table: str) -> ResponseSchema[List[Dict]]:
+    """
+    Get column information for a specific table.
+
+    Args:
+        schema (str): Schema name
+        table (str): Table name
+
+    Returns:
+        ResponseSchema[List[Dict]]: List of column information
+    """
+    try:
+        columns = get_table_columns(schema, table)
+        return ResponseSchema(
+            success=True,
+            message=f"Column information retrieved for {schema}.{table}",
+            data=columns,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reports")
+def get_reports(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
 ) -> ResponseSchema[List[Any]]:
     """
-    Get records from a specific table.
+    Get records from the Report table.
 
     Args:
-        table_name (str): Name of the table
         skip (int): Number of records to skip
         limit (int): Maximum number of records to return
         db (Session): Database session from dependency
 
     Returns:
-        ResponseSchema[List[Any]]: List of records from the table
+        ResponseSchema[List[Any]]: List of Report records
     """
     try:
-        if table_name not in Base.classes:
-            raise HTTPException(
-                status_code=404, detail=f"Table '{table_name}' not found"
-            )
-
-        Table = Base.classes[table_name]
-        records = db.query(Table).offset(skip).limit(limit).all()
-
+        reports = db.query(Report).offset(skip).limit(limit).all()
         return ResponseSchema(
-            success=True,
-            message=f"Records retrieved successfully from {table_name}",
-            data=records,
+            success=True, message="Reports retrieved successfully", data=reports
         )
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
